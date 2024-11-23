@@ -135,7 +135,7 @@ class PieLogger:
         Returns:
             str: Formatted string containing relative file path and line number
         """
-        frame = inspect.stack()[3]
+        frame = inspect.stack()[4]
         file_name = frame.filename
         line_number = frame.lineno
 
@@ -224,8 +224,8 @@ class PieLogger:
 
             return console_log
 
-    def log(self, level: int, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-            colorful: bool = True) -> None:
+    def __log(self, level: int, message: str, details: Optional[Dict] = None, exec_info: bool = False,
+              colorful: bool = True) -> None:
         """
         Internal method to process and output a log message.
 
@@ -239,6 +239,20 @@ class PieLogger:
         console_log = self.__console_log(level, message, details, exec_info, colorful)
         self.console_logger.log(level, console_log)
 
+    def log(self, level: int, message: str, details: Optional[Dict] = None, exec_info: bool = False,
+            colorful: bool = True) -> None:
+        """
+        Log a message at the specified level.
+
+        Args:
+            level (int): Logging level
+            message (str): Main log message
+            details (Optional[Dict]): Additional structured data to include as JSON
+            exec_info (bool): Whether to include stack trace
+            colorful (bool): Whether to apply colors to this specific message
+        """
+        self.__log(level, message, details, exec_info, colorful)
+
     def debug(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
               colorful: bool = True) -> None:
         """
@@ -250,7 +264,7 @@ class PieLogger:
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
-        self.log(PieLogLevel.DEBUG, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.DEBUG, message, details, exec_info, colorful)
 
     def info(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
              colorful: bool = True) -> None:
@@ -263,7 +277,7 @@ class PieLogger:
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
-        self.log(PieLogLevel.INFO, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.INFO, message, details, exec_info, colorful)
 
     def warning(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
                 colorful: bool = True) -> None:
@@ -276,7 +290,7 @@ class PieLogger:
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
-        self.log(PieLogLevel.WARNING, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.WARNING, message, details, exec_info, colorful)
 
     def error(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
               colorful: bool = True) -> None:
@@ -289,7 +303,7 @@ class PieLogger:
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
-        self.log(PieLogLevel.ERROR, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.ERROR, message, details, exec_info, colorful)
 
     def critical(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
                  colorful: bool = True) -> None:
@@ -302,7 +316,7 @@ class PieLogger:
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
-        self.log(PieLogLevel.CRITICAL, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.CRITICAL, message, details, exec_info, colorful)
 
     def log_execution(
             self,
@@ -342,7 +356,7 @@ class PieLogger:
                         "args": str(args),
                         "kwargs": str(kwargs)
                     }
-                self.log(
+                self.__log(
                     level=start_message_log_level,
                     message=start_msg,
                     details=start_details,
@@ -360,7 +374,7 @@ class PieLogger:
                         "result": str(result)
                     }
 
-                self.log(
+                self.__log(
                     level=end_message_log_level,
                     message=end_msg,
                     details=end_details,

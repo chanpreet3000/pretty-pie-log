@@ -1,9 +1,11 @@
 import logging
 
+from pie_log_level import PieLogLevel
 from pie_logger import PieLogger
 
 logger = PieLogger('Logger')
 
+logger.log(PieLogLevel.CRITICAL, 'This is a critical message', {'key': 'value'})
 logger.info('This is an info message', {'key': 'value'})
 logger.debug('This is a debug message', {'key': 'value'}, colorful=False)
 logger.info('This is an info message', {'key': 'value'}, colorful=False)
