@@ -1,3 +1,23 @@
+# Copyright (c) 2024 Chanpreet Singh
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import json
 import logging
 import inspect
@@ -10,9 +30,11 @@ import sys
 import traceback
 from datetime import datetime
 from colorama import Fore
-from typing import AnyStr, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 from pie_log_level import PieLogLevel
+
+T = TypeVar('T')  # For generic return type in decorator
 
 
 class PieLogger:
@@ -47,7 +69,7 @@ class PieLogger:
             minimum_log_level: int = PieLogLevel.INFO,
             default_log_color: Fore = Fore.WHITE,
             details_indent: int = 2
-    ):
+    ) -> None:
         """
         Initialize a new Logger instance with customizable formatting and color options.
 
@@ -81,6 +103,7 @@ class PieLogger:
         self._default_log_color = default_log_color
         self._details_indent = details_indent
         self._log_lock = Lock()
+        self.console_logger: logging.Logger
 
         if self._colorful:
             self._debug_log_color = debug_log_color
@@ -103,7 +126,7 @@ class PieLogger:
 
         self.__initialize_logger()
 
-    def __initialize_logger(self):
+    def __initialize_logger(self) -> None:
         """
         Initialize the console logger with the specified minimum log level and stdout handler.
         """
@@ -112,12 +135,12 @@ class PieLogger:
         self.console_logger.addHandler(logging.StreamHandler(sys.stdout))
 
     @staticmethod
-    def __get_project_root() -> AnyStr:
+    def __get_project_root() -> str:
         """
         Determine the project root directory by looking for main.py file. If not found, use the current directory.
 
         Returns:
-            AnyStr: Absolute path to the project root directory
+            str: Absolute path to the project root directory
         """
         current_path = os.path.abspath(os.path.dirname(__file__))
         while True:
@@ -182,16 +205,22 @@ class PieLogger:
 
         return self._default_log_color
 
-    def __console_log(self, level: int, message: str, details: Optional[Dict],
-                      exec_info: Exception | bool | None, colorful: bool) -> str:
+    def __console_log(
+            self,
+            level: int,
+            message: str,
+            details: Optional[Dict[str, Any]],
+            exec_info: Optional[Union[bool, Exception]],
+            colorful: bool
+    ) -> str:
         """
         Format a log message with all configured components in a thread-safe manner.
 
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include stack trace
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
+            exec_info (Optional[Union[bool, Exception]]): Exception object or boolean for stack trace inclusion
             colorful (bool): Whether to apply colors to this specific message
 
         Returns:
@@ -224,95 +253,132 @@ class PieLogger:
 
             return console_log
 
-    def __log(self, level: int, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-              colorful: bool = True) -> None:
+    def __log(
+            self,
+            level: int,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Internal method to process and output a log message.
 
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
         console_log = self.__console_log(level, message, details, exec_info, colorful)
         self.console_logger.log(level, console_log)
 
-    def log(self, level: int, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-            colorful: bool = True) -> None:
+    def log(
+            self,
+            level: int,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Log a message at the specified level.
 
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
         self.__log(level, message, details, exec_info, colorful)
 
-    def debug(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-              colorful: bool = True) -> None:
+    def debug(
+            self,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Log a debug level message.
 
         Args:
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.DEBUG, message, details, exec_info, colorful)
 
-    def info(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-             colorful: bool = True) -> None:
+    def info(
+            self,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Log an info level message.
 
         Args:
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.INFO, message, details, exec_info, colorful)
 
-    def warning(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-                colorful: bool = True) -> None:
+    def warning(
+            self,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Log a warning level message.
 
         Args:
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.WARNING, message, details, exec_info, colorful)
 
-    def error(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-              colorful: bool = True) -> None:
+    def error(
+            self,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Log an error level message.
 
         Args:
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.ERROR, message, details, exec_info, colorful)
 
-    def critical(self, message: str, details: Optional[Dict] = None, exec_info: bool = False,
-                 colorful: bool = True) -> None:
+    def critical(
+            self,
+            message: str,
+            details: Optional[Dict[str, Any]] = None,
+            exec_info: bool = False,
+            colorful: bool = True
+    ) -> None:
         """
         Log a critical level message.
 
         Args:
             message (str): Main log message
-            details (Optional[Dict]): Additional structured data to include as JSON
+            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
             colorful (bool): Whether to apply colors to this specific message
         """
@@ -326,7 +392,7 @@ class PieLogger:
             print_result_at_end: bool = False,
             start_message_log_level: int = PieLogLevel.INFO,
             end_message_log_level: int = PieLogLevel.INFO
-    ) -> Callable:
+    ) -> Callable[[Callable[..., T]], Callable[..., T]]:
         """
         Creates a decorator that logs function entry and exit with timestamps.
 
@@ -338,18 +404,32 @@ class PieLogger:
             start_message_log_level (int): Log level for start message
             end_message_log_level (int): Log level for end message
 
-        Usage:
-        @logger.log_execution(start_message="Starting my task", end_message="Task finished")
-        def my_function():
-            pass
+        Returns:
+            Callable[[Callable[..., T]], Callable[..., T]]: A decorator function that wraps the original
+                function with logging functionality while preserving its return type
+
+        Example:
+            ```python
+            logger = PieLogger("my_logger")
+
+            @logger.log_execution(
+                start_message="Starting task",
+                end_message="Task completed",
+                print_args_at_start=True,
+                print_result_at_end=True
+            )
+            def process_data(data: List[str]) -> Dict[str, Any]:
+                # Function implementation
+                return {"status": "success"}
+            ```
         """
 
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: Callable[..., T]) -> Callable[..., T]:
             @wraps(func)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args: Any, **kwargs: Any) -> T:
                 # Use custom start message or default
                 start_msg = start_message or f"Start of {func.__name__}"
-                start_details = None
+                start_details: Optional[Dict[str, str]] = None
                 if print_args_at_start:
                     start_details = {
                         "function": func.__name__,
@@ -363,11 +443,11 @@ class PieLogger:
                 )
 
                 # Execute function
-                result = func(*args, **kwargs)
+                result: T = func(*args, **kwargs)
 
                 # Use custom end message or default
                 end_msg = end_message or f"End of {func.__name__}"
-                end_details = None
+                end_details: Optional[Dict[str, str]] = None
                 if print_result_at_end:
                     end_details = {
                         "function": func.__name__,
