@@ -4,7 +4,7 @@ from pie_logger import PieLogger
 
 logger = PieLogger('Logger')
 
-
+logger.info('This is an info message', {'key': 'value'})
 logger.debug('This is a debug message', {'key': 'value'}, colorful=False)
 logger.info('This is an info message', {'key': 'value'}, colorful=False)
 logger.warning('This is a warning message', {'key': 'value'}, colorful=False)
