@@ -1,9 +1,9 @@
 class PieLogLevel:
-    DEBUG = 0
-    INFO = 1
-    WARNING = 2
-    ERROR = 3
-    CRITICAL = 4
+    DEBUG = 10
+    INFO = 20
+    WARNING = 30
+    ERROR = 40
+    CRITICAL = 50
 
     @staticmethod
     def get_level_str(level: int):
