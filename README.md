@@ -63,9 +63,8 @@ def process_data(data):
 process_data([1, 2, 3, 4, 5])
 ```
 
-<div align="center">
-  <img src="./assets/quick-start-output.png" alt="Quick Start Example Output" width="800"/>
-</div>
+![image](https://github.com/user-attachments/assets/57f7474d-21d5-4beb-9f67-6054d330e5a6)
+
 
 ## Detailed Configuration
 
@@ -96,9 +95,8 @@ logger = PieLogger(
 )
 ```
 
-<div align="center">
-  <img src="./assets/configuration-example.png" alt="Configuration Example Output" width="800"/>
-</div>
+![image](https://github.com/user-attachments/assets/24fe9c46-1108-4381-a1d0-60c870b1832a)
+
 
 ### Log Levels
 
@@ -112,9 +110,8 @@ PieLogLevel.ERROR  # Level 3
 PieLogLevel.CRITICAL  # Level 4
 ```
 
-<div align="center">
-  <img src="./assets/log-levels-demo.png" alt="Log Levels Example" width="800"/>
-</div>
+![image](https://github.com/user-attachments/assets/a2bac36f-33a6-4f4e-83f1-9fed6976bdd2)
+
 
 ### Logging Methods
 
@@ -154,9 +151,8 @@ def my_function(arg1, arg2):
 my_function("arg1", "arg2")
 ```
 
-<div align="center">
-  <img src="./assets/function-tracking-example.png" alt="Function Tracking Example" width="800"/>
-</div>
+![image](https://github.com/user-attachments/assets/40fc19e2-89b5-4fc7-9437-7acc9f98c6a2)
+
 
 ## Output Format
 
@@ -172,9 +168,8 @@ Stack trace               # If exec_info=True
 
 Example output:
 
-<div align="center">
-  <img src="./assets/output-format-example.png" alt="Output Format Example" width="800"/>
-</div>
+![image](https://github.com/user-attachments/assets/7bf4908c-469b-44a1-82bd-b51f54e85071)
+
 
 ## Project Root Detection
 
@@ -197,9 +192,8 @@ except Exception:
     logger.error("Error processing data", exec_info=True)
 ```
 
-<div align="center">
-  <img src="./assets/exception-handling-example.png" alt="Exception Handling Example" width="800"/>
-</div>
+![image](https://github.com/user-attachments/assets/644375fd-f7ba-4371-a809-cebff5f9c907)
+
 
 ## Dependencies
 
