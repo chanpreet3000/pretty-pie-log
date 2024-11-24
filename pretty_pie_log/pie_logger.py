@@ -32,7 +32,7 @@ from datetime import datetime
 from colorama import Fore
 from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
-from pie_log_level import PieLogLevel
+from .pie_log_level import PieLogLevel
 
 T = TypeVar('T')  # For generic return type in decorator
 
