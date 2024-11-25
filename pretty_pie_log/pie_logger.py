@@ -29,7 +29,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
-from colorama import Fore
+from colorama import Fore, Style
 from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 from .pie_log_level import PieLogLevel
@@ -103,26 +103,16 @@ class PieLogger:
         self._default_log_color = default_log_color
         self._details_indent = details_indent
         self._log_lock = Lock()
-        self.console_logger: logging.Logger
 
-        if self._colorful:
-            self._debug_log_color = debug_log_color
-            self._info_log_color = info_log_color
-            self._warning_log_color = warning_log_color
-            self._error_log_color = error_log_color
-            self._critical_log_color = critical_log_color
-            self._timestamp_log_color = timestamp_log_color
-            self._file_path_log_color = file_path_log_color
-            self._details_log_color = details_log_color
-        else:
-            self._debug_log_color = default_log_color
-            self._info_log_color = default_log_color
-            self._warning_log_color = default_log_color
-            self._error_log_color = default_log_color
-            self._critical_log_color = default_log_color
-            self._timestamp_log_color = default_log_color
-            self._file_path_log_color = default_log_color
-            self._details_log_color = default_log_color
+        self.console_logger: logging.Logger
+        self._debug_log_color = debug_log_color
+        self._info_log_color = info_log_color
+        self._warning_log_color = warning_log_color
+        self._error_log_color = error_log_color
+        self._critical_log_color = critical_log_color
+        self._timestamp_log_color = timestamp_log_color
+        self._file_path_log_color = file_path_log_color
+        self._details_log_color = details_log_color
 
         self.__initialize_logger()
 
@@ -205,13 +195,19 @@ class PieLogger:
 
         return self._default_log_color
 
+    def __get_final_color(self, color: Fore, colorful: Optional[bool]) -> Fore:
+        is_colorful = self._colorful
+        if colorful is not None:
+            is_colorful = colorful
+        return color if is_colorful else self._default_log_color
+
     def __console_log(
             self,
             level: int,
             message: str,
             details: Optional[Dict[str, Any]],
             exec_info: Optional[Union[bool, Exception]],
-            colorful: bool
+            colorful: Optional[bool]
     ) -> str:
         """
         Format a log message with all configured components in a thread-safe manner.
@@ -221,23 +217,24 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (Optional[Union[bool, Exception]]): Exception object or boolean for stack trace inclusion
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
 
         Returns:
             str: Formatted log message string
         """
         with self._log_lock:
-            timestamp_log_color = self._timestamp_log_color if colorful else self._default_log_color
-            file_path_log_color = self._file_path_log_color if colorful else self._default_log_color
-            details_log_color = self._details_log_color if colorful else self._default_log_color
-            level_color = self.__get_color_from_level(level) if colorful else self._default_log_color
+            timestamp_log_color = self.__get_final_color(self._timestamp_log_color, colorful)
+            file_path_log_color = self.__get_final_color(self._file_path_log_color, colorful)
+            details_log_color = self.__get_final_color(self._details_log_color, colorful)
+            level_color = self.__get_final_color(self.__get_color_from_level(level), colorful)
+            level_name = PieLogLevel.get_level_str(level)
 
             file_path_info = self.__get_log_details()
             timestamp = self.__get_timestamp()
 
             console_log_parts = [
                 f"{timestamp_log_color}{timestamp:<{self._timestamp_padding}}",
-                f"{level_color}{PieLogLevel.get_level_str(level):<{self._log_level_padding}}",
+                f"{level_color}{level_name:<{self._log_level_padding}}",
                 f"{file_path_log_color}{file_path_info:<{self._file_path_padding}}",
                 f": {level_color}{message}"
             ]
@@ -251,7 +248,7 @@ class PieLogger:
                 exec_details = ''.join(traceback.format_exc())
                 console_log += f"\n{level_color}{exec_details}"
 
-            return console_log
+            return console_log + f"{Style.RESET_ALL}"
 
     def __log(
             self,
@@ -259,7 +256,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Internal method to process and output a log message.
@@ -269,7 +266,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         console_log = self.__console_log(level, message, details, exec_info, colorful)
         self.console_logger.log(level, console_log)
@@ -280,7 +277,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Log a message at the specified level.
@@ -290,7 +287,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         self.__log(level, message, details, exec_info, colorful)
 
@@ -299,7 +296,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Log a debug level message.
@@ -308,7 +305,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.DEBUG, message, details, exec_info, colorful)
 
@@ -317,7 +314,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Log an info level message.
@@ -326,7 +323,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.INFO, message, details, exec_info, colorful)
 
@@ -335,7 +332,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Log a warning level message.
@@ -344,7 +341,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.WARNING, message, details, exec_info, colorful)
 
@@ -353,7 +350,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Log an error level message.
@@ -362,7 +359,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.ERROR, message, details, exec_info, colorful)
 
@@ -371,7 +368,7 @@ class PieLogger:
             message: str,
             details: Optional[Dict[str, Any]] = None,
             exec_info: bool = False,
-            colorful: bool = True
+            colorful: Optional[bool] = None
     ) -> None:
         """
         Log a critical level message.
@@ -380,7 +377,7 @@ class PieLogger:
             message (str): Main log message
             details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
             exec_info (bool): Whether to include stack trace
-            colorful (bool): Whether to apply colors to this specific message
+            colorful (Optional[bool]): Whether to apply colors to this specific message
         """
         self.__log(PieLogLevel.CRITICAL, message, details, exec_info, colorful)
 
