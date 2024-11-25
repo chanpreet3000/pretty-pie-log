@@ -25,20 +25,22 @@ pip install pretty-pie-log
 - **Smart Path Detection**: Automatic relative file path detection from project root
 - **Stack Trace Integration**: Optional exception stack trace inclusion
 - **Function Execution Tracking**: Decorator for monitoring function entry/exit with customizable details
-- **Minimal Dependencies**: Only requires `colorama` and `pytz`
+- **File Logging**: Configurable file logging with rotating file handler
+- **Minimal Dependencies**: Only requires `colorama`, `pytz`
 
 ## Quick Start
 
 ```python
-from pretty_pie_log import PieLogger
+from pretty_pie_log import PieLogger, PieLogLevel
 
 # Create a logger instance
 logger = PieLogger(
     logger_name="my_app",
-    timezone="America/New_York"  # Optional: defaults to UTC
+    timezone="America/New_York",  # Optional: Set specific timezone
+    minimum_log_level=PieLogLevel.INFO  # Optional: Set minimum log level
 )
 
-# Basic logging
+# Basic logging methods
 logger.info("Application started")
 logger.debug("Debug message", details={"user_id": 123})
 logger.warning("Warning message")
@@ -75,39 +77,37 @@ from pretty_pie_log import PieLogger, PieLogLevel
 from colorama import Fore
 
 logger = PieLogger(
-    logger_name="my_app",  # Required: Unique identifier
-    timezone="America/New_York",  # Optional: Timezone for timestamps
-    timestamp_padding=30,  # Optional: Width of timestamp field
-    log_level_padding=10,  # Optional: Width of log level field
-    file_path_padding=30,  # Optional: Width of file path field
-    debug_log_color=Fore.CYAN,  # Optional: Color for debug messages
-    info_log_color=Fore.GREEN,  # Optional: Color for info messages
-    warning_log_color=Fore.YELLOW,  # Optional: Color for warning messages
-    error_log_color=Fore.RED,  # Optional: Color for error messages
-    critical_log_color=Fore.MAGENTA,  # Optional: Color for critical messages
-    timestamp_log_color=Fore.LIGHTBLUE_EX,  # Optional: Color for timestamp
-    file_path_log_color=Fore.WHITE,  # Optional: Color for file path
-    details_log_color=Fore.LIGHTWHITE_EX,  # Optional: Color for JSON details
-    colorful=True,  # Optional: Enable/disable colors
-    minimum_log_level=PieLogLevel.INFO,  # Optional: Minimum logging level
-    default_log_color=Fore.WHITE,  # Optional: Default color when colorful=False
-    details_indent=2  # Optional: JSON indentation spaces
+    # Required Parameters
+    logger_name="my_app",  # Unique identifier for the logger
+
+    # Optional Timezone and Formatting Parameters
+    timezone="America/New_York",  # Defaults to UTC if not specified
+    timestamp_padding=30,  # Width of timestamp field
+    log_level_padding=10,  # Width of log level field
+    file_path_padding=30,  # Width of file path field
+
+    # Optional Color Configuration
+    debug_log_color=Fore.CYAN,
+    info_log_color=Fore.GREEN,
+    warning_log_color=Fore.YELLOW,
+    error_log_color=Fore.RED,
+    critical_log_color=Fore.MAGENTA,
+    timestamp_log_color=Fore.WHITE,
+    file_path_log_color=Fore.WHITE,
+    details_log_color=Fore.LIGHTWHITE_EX,
+
+    # Logging Control
+    colorful=True,  # Enable/disable color output
+    minimum_log_level=PieLogLevel.INFO,  # Minimum logging level
+    default_log_color=Fore.WHITE,  # Color when colorful is False
+    details_indent=2,  # JSON indentation spaces
+
+    # File Logging Options
+    log_to_file=True,  # Enable/disable file logging
+    log_directory='logs',  # Directory for log files
+    log_file_size_limit=32 * 1024 * 1024,  # 32 MB max log file size
+    max_backup_files=10  # Number of backup log files to keep
 )
-```
-
-![image](https://github.com/user-attachments/assets/24fe9c46-1108-4381-a1d0-60c870b1832a)
-
-
-### Log Levels
-
-The package provides five standard log levels through the `PieLogLevel` class:
-
-```python
-PieLogLevel.DEBUG  # Level 0
-PieLogLevel.INFO  # Level 1
-PieLogLevel.WARNING  # Level 2
-PieLogLevel.ERROR  # Level 3
-PieLogLevel.CRITICAL  # Level 4
 ```
 
 ![image](https://github.com/user-attachments/assets/a2bac36f-33a6-4f4e-83f1-9fed6976bdd2)
@@ -122,11 +122,21 @@ logger.info(
     message="Main log message",
     details={"key": "value"},  # Optional: Additional structured data
     exec_info=False,  # Optional: Include stack trace
-    colorful=True  # Optional: Apply colors to this message
+    colorful=True  # Optional: Override global color setting
 )
 ```
 
-### Function Execution Tracking
+## Log Levels
+
+The package provides five standard log levels:
+
+- `PieLogLevel.DEBUG` (10)
+- `PieLogLevel.INFO` (20)
+- `PieLogLevel.WARNING` (30)
+- `PieLogLevel.ERROR` (40)
+- `PieLogLevel.CRITICAL` (50)
+
+## Function Execution Tracking
 
 The `log_execution` decorator provides detailed monitoring of function execution:
 
@@ -137,12 +147,12 @@ logger = PieLogger("my_logger")
 
 
 @logger.log_execution(
-    start_message="Custom start message",  # Optional: Message at function start
-    end_message="Custom end message",  # Optional: Message at function end
+    start_message="Custom start message",  # Optional
+    end_message="Custom end message",  # Optional
     print_args_at_start=True,  # Optional: Log function arguments
     print_result_at_end=True,  # Optional: Log function result
-    start_message_log_level=PieLogLevel.INFO,  # Optional: Log level for start
-    end_message_log_level=PieLogLevel.INFO  # Optional: Log level for end
+    start_message_log_level=PieLogLevel.INFO,  # Optional: Start log level
+    end_message_log_level=PieLogLevel.INFO  # Optional: End log level
 )
 def my_function(arg1, arg2):
     return "result"
@@ -156,14 +166,10 @@ my_function("arg1", "arg2")
 
 ## Output Format
 
-The logger produces formatted output with the following components:
-
 ```
-[Timestamp] [Log Level] [File:Line] : Message
-{
-  "detailed": "json data"  # If details provided
-}
-Stack trace               # If exec_info=True
+[Timestamp]                [LogLevel]  [File:Line]                 : Message
+{Optional JSON details}
+{Optional stack trace}
 ```
 
 Example output:
@@ -203,8 +209,8 @@ except Exception:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please submit a Pull Request.
 
 ## License
 
-[This project is licensed under the MIT License - see the LICENSE file for details.](LICENSE)
+[MIT License](LICENSE)

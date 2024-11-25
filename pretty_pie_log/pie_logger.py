@@ -57,7 +57,7 @@ class PieLogger:
             self,
             logger_name: str,
             timezone: Optional[str] = None,
-            timestamp_padding: int = 30,
+            timestamp_padding: int = 25,
             log_level_padding: int = 10,
             file_path_padding: int = 30,
             debug_log_color: Fore = Fore.CYAN,
@@ -75,7 +75,7 @@ class PieLogger:
             log_to_file: bool = True,
             log_directory: str = 'logs',
             log_file_size_limit: int = 32 * 1024 * 1024,
-            max_backup_files: int = 2,
+            max_backup_files: int = 10,
     ) -> None:
         """
         Initialize a new Logger instance with customizable formatting, color and output options.
@@ -101,7 +101,7 @@ class PieLogger:
             log_to_file (bool): Enable/disable file logging (default: True)
             log_directory (str): Directory for log files (default: 'logs')
             log_file_size_limit (int): Maximum size for log files in bytes (default: 32 MB = 32 * 1024 * 1024)
-            max_backup_files (int): Number of backup log files to keep (default: 2)
+            max_backup_files (int): Number of backup log files to keep (default: 10)
         """
         self._start_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
