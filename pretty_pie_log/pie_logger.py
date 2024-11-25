@@ -161,9 +161,6 @@ class PieLogger:
                 backupCount=self._max_backup_files
             )
 
-            # Set a custom namer function for rotated log files
-            file_handler.namer = lambda name: f"{self._logger_name}-{self._start_timestamp}-({name.split('.')[-2]}).log"
-
             # Add the file handler to the logger
             self.file_logger.addHandler(file_handler)
 
