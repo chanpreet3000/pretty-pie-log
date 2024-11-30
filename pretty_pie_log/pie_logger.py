@@ -1,23 +1,3 @@
-# Copyright (c) 2024 Chanpreet Singh
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
 import json
 import logging
 import inspect
@@ -48,7 +28,7 @@ class PieLogger:
     - Timezone-aware timestamps
     - Structured logging with formatted JSON output
     - Automatic source code location detection
-    - Stack trace integration for debugging
+    - Error stack trace integration for debugging
     - Rotating file logs with size limits and backups
     - Customizable field padding and indentation
     """
@@ -252,12 +232,31 @@ class PieLogger:
             is_colorful = colorful
         return color if is_colorful else self._default_log_color
 
+    def make_serializable(self, obj: Any):
+        """
+        Recursively convert non-serializable objects in a nested structure
+        (e.g., dict, list, tuple) into JSON-serializable equivalents.
+        """
+        if isinstance(obj, dict):
+            return {
+                self.make_serializable(key): self.make_serializable(value)
+                for key, value in obj.items()
+            }
+        elif isinstance(obj, (list, tuple)):
+            return [self.make_serializable(item) for item in obj]
+        elif isinstance(obj, set):
+            return list(self.make_serializable(item) for item in obj)
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+
+        return str(obj)
+
     def __console_log(
             self,
             level: int,
             message: str,
-            details: Optional[Dict[str, Any]],
-            exec_info: Optional[Union[bool, Exception]],
+            details: Optional[Any],
+            print_exception: Optional[Union[bool, Exception]],
             colorful: Optional[bool]
     ) -> str:
         """
@@ -266,8 +265,8 @@ class PieLogger:
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (Optional[Union[bool, Exception]]): Exception object or boolean for stack trace inclusion
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (Optional[Union[bool, Exception]]): Exception object or boolean for error stack trace inclusion
             colorful (Optional[bool]): Override for color output settings
 
         Returns:
@@ -292,10 +291,11 @@ class PieLogger:
             console_log = " ".join(console_log_parts)
 
             if details:
-                formatted_details = json.dumps(details, indent=self._details_indent)
+                serializable_details = self.make_serializable(details)
+                formatted_details = json.dumps(serializable_details, indent=self._details_indent)
                 console_log += f"\n{details_log_color}{formatted_details}"
 
-            if exec_info:
+            if print_exception:
                 exec_details = ''.join(traceback.format_exc())
                 console_log += f"\n{level_color}{exec_details}"
 
@@ -305,8 +305,8 @@ class PieLogger:
             self,
             level: int,
             message: str,
-            details: Optional[Dict[str, Any]],
-            exec_info: Optional[Union[bool, Exception]]
+            details: Optional[Any],
+            print_exception: Optional[Union[bool, Exception]]
     ) -> str:
         """
         Format a log message for file output without color codes or styling.
@@ -314,8 +314,8 @@ class PieLogger:
         Args:
             level (int): Logging severity level
             message (str): Main log message text
-            details (Optional[Dict[str, Any]]: Additional contextual data to include as formatted JSON
-            exec_info (bool): Exception information or flag for stack trace inclusion
+            details (Optional[Any]: Additional contextual data to include as formatted JSON
+            print_exception (bool): Exception information or flag for error stack trace inclusion
 
         Returns:
             Formatted log message string suitable for file output
@@ -333,10 +333,11 @@ class PieLogger:
         file_log = " ".join(file_log_parts)
 
         if details:
-            formatted_details = json.dumps(details, indent=self._details_indent)
+            serializable_details = self.make_serializable(details)
+            formatted_details = json.dumps(serializable_details, indent=self._details_indent)
             file_log += f"\n{formatted_details}"
 
-        if exec_info:
+        if print_exception:
             exec_details = ''.join(traceback.format_exc())
             file_log += f"\n{exec_details}"
 
@@ -346,8 +347,8 @@ class PieLogger:
             self,
             level: int,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -356,23 +357,23 @@ class PieLogger:
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        console_log = self.__console_log(level, message, details, exec_info, colorful)
+        console_log = self.__console_log(level, message, details, print_exception, colorful)
         self.console_logger.log(level, console_log)
 
         if self._log_to_file:
-            file_log = self.__file_log(level, message, details, exec_info)
+            file_log = self.__file_log(level, message, details, print_exception)
             self.file_logger.log(level, file_log)
 
     def log(
             self,
             level: int,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -381,17 +382,17 @@ class PieLogger:
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        self.__log(level, message, details, exec_info, colorful)
+        self.__log(level, message, details, print_exception, colorful)
 
     def debug(
             self,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -399,17 +400,17 @@ class PieLogger:
 
         Args:
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        self.__log(PieLogLevel.DEBUG, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.DEBUG, message, details, print_exception, colorful)
 
     def info(
             self,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -417,17 +418,17 @@ class PieLogger:
 
         Args:
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        self.__log(PieLogLevel.INFO, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.INFO, message, details, print_exception, colorful)
 
     def warning(
             self,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -435,17 +436,17 @@ class PieLogger:
 
         Args:
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        self.__log(PieLogLevel.WARNING, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.WARNING, message, details, print_exception, colorful)
 
     def error(
             self,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -453,17 +454,17 @@ class PieLogger:
 
         Args:
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        self.__log(PieLogLevel.ERROR, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.ERROR, message, details, print_exception, colorful)
 
     def critical(
             self,
             message: str,
-            details: Optional[Dict[str, Any]] = None,
-            exec_info: bool = False,
+            details: Optional[Any] = None,
+            print_exception: bool = False,
             colorful: Optional[bool] = None
     ) -> None:
         """
@@ -471,11 +472,11 @@ class PieLogger:
 
         Args:
             message (str): Main log message
-            details (Optional[Dict[str, Any]]): Additional structured data to include as JSON
-            exec_info (bool): Whether to include error trace
+            details (Optional[Any]): Additional structured data to include as JSON
+            print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        self.__log(PieLogLevel.CRITICAL, message, details, exec_info, colorful)
+        self.__log(PieLogLevel.CRITICAL, message, details, print_exception, colorful)
 
     def log_execution(
             self,
