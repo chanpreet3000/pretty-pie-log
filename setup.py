@@ -6,9 +6,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pretty_pie_log",
-    version="0.3.11",
+    version="0.3.12",
     author="chanpreet3000",
-    author_email="chanpreet3000@gmail.com",
     description="A feature-rich logging utility that provides colorized console output with customizable formatting",
     long_description=long_description,
     long_description_content_type="text/markdown",

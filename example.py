@@ -8,9 +8,7 @@ from pretty_pie_log import PieLogger, PieLogLevel
 # Create a logger instance with custom configuration
 logger = PieLogger(
     logger_name="TestLogger",
-    timezone="America/New_York",  # Example timezone
     minimum_log_level=PieLogLevel.DEBUG,
-    log_directory='custom_logs',
     colorful=True
 )
 
