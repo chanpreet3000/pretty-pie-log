@@ -129,7 +129,7 @@ class PieLogger:
             # File logger setup
             logs_dir = os.path.join(self.__get_project_root(), self._log_directory, self._start_timestamp)
             os.makedirs(logs_dir, exist_ok=True)
-            log_file_path = os.path.join(logs_dir, f"{self._logger_name}-{self._start_timestamp}.log")
+            log_file_path = os.path.join(logs_dir, f"{self._logger_name}.log")
 
             self.file_logger = logging.getLogger(f"{self._logger_name}_file")
             self.file_logger.setLevel(self._minimum_log_level)
