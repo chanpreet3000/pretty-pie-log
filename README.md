@@ -84,6 +84,10 @@ def process_data(data):
 process_data([1, 2, 3, 4, 5])
 ```
 
+### Output
+
+![image](https://github.com/user-attachments/assets/06cfb79d-8900-4116-a00a-47502f54a386)
+
 ---
 
 ## Detailed Configuration
@@ -128,7 +132,8 @@ logger = PieLogger(
     max_backup_files=10  # Number of backup log files to keep
 )
 ```
-
+### Output using the above configuration
+![image](https://github.com/user-attachments/assets/24fe9c46-1108-4381-a1d0-60c870b1832a)
 ---
 
 ## Logging Methods
@@ -197,26 +202,8 @@ logger.error(
 )
 ```
 
-Output:
-
-```text
-2024-11-30 10:50:48.966   INFO       ./../example.py:16             : User login attempt
-{
-  "user_id": 123,
-  "status": "success"
-}
-2024-11-30 10:50:48.968   DEBUG      ./../example.py:22             : Processing items
-[
-  1,
-  2,
-  3,
-  4,
-  5
-]
-2024-11-30 10:50:48.970   WARNING    ./../example.py:38             : Custom object logged
-"User(user_id=123, name=John Doe)"
-2024-11-30 10:50:48.972   ERROR      ./../example.py:44             : Critical failure occurred
-```
+### Output:
+![image](https://github.com/user-attachments/assets/0fe71acd-e831-434e-83a6-8faf59a5fba0)
 
 ### Automatic Serialization
 
@@ -278,19 +265,7 @@ def task(arg1, arg2):
 
 ### Console Output
 
-```text
-2024-11-30 10:53:11.645   DEBUG      ./../example.py:96             : Starting task...
-{
-  "function": "task",
-  "args": "('arg1', 'arg2')",
-  "kwargs": "{}"
-}
-2024-11-30 10:53:11.647   INFO       ./../example.py:96             : Task complete.
-{
-  "function": "task",
-  "result": "result"
-}
-```
+![image](https://github.com/user-attachments/assets/15c5ccac-6808-4543-ad1c-7f6895593244)
 
 ---
 
