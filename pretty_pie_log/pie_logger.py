@@ -55,7 +55,7 @@ class PieLogger:
             log_to_file: bool = True,
             log_directory: str = 'logs',
             log_file_size_limit: int = 32 * 1024 * 1024,
-            max_backup_files: int = 10,
+            max_backup_files: int = 0,
     ) -> None:
         """
         Initialize a new Logger instance with customizable formatting, color and output options.
@@ -478,6 +478,22 @@ class PieLogger:
         """
         self.__log(PieLogLevel.CRITICAL, message, details, print_exception, colorful)
 
+    def exception(
+            self,
+            message: str,
+            details: Optional[Any] = None,
+            colorful: Optional[bool] = None
+    ) -> None:
+        """
+        Log an error message with stack trace.
+
+        Args:
+            message (str): Main log message
+            details (Optional[Any]): Additional structured data to include as JSON
+            colorful (Optional[bool]): Whether to apply colors to this specific message
+        """
+        self.__log(PieLogLevel.ERROR, message, details, print_exception=True, colorful=colorful)
+
     def log_execution(
             self,
             start_message: Optional[str] = None,
@@ -534,6 +550,7 @@ class PieLogger:
                     level=start_message_log_level,
                     message=start_msg,
                     details=start_details,
+                    colorful=self._colorful
                 )
 
                 # Execute function
@@ -552,6 +569,7 @@ class PieLogger:
                     level=end_message_log_level,
                     message=end_msg,
                     details=end_details,
+                    colorful=self._colorful
                 )
 
                 return result

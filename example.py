@@ -47,14 +47,14 @@ def main():
     logger.debug("This is a debug message", details={"key": "debug_value"})
     logger.info("This is an info message", details={"user_id": 12345})
     logger.warning("This is a warning message", details={"warning_code": "W001"})
+    logger.error("This is an error message", details={"error_code": "E123"})
+    logger.critical("This is a critical message", details={"critical_event": "System failure"})
 
     # Demonstrate error logging with exception trace
     try:
         x = 1 / 0  # Intentional division by zero
-    except ZeroDivisionError as e:
-        logger.error("An error occurred during division",
-                     details={"operation": "1/0", "error_type": type(e).__name__},
-                     print_exception=True)
+    except:
+        logger.exception("This is an exception message")
 
     # Demonstrate critical logging
     logger.critical("This is a critical message",
@@ -78,9 +78,6 @@ def main():
     # Test different color settings
     logger.debug("Colored debug message", colorful=True)
     logger.info("Black and white info message", colorful=False)
-
-    # Log with colorful override
-    logger.warning("Colorful warning even if global color is off", colorful=True)
 
 
 if __name__ == "__main__":
