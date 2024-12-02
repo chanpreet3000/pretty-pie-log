@@ -7,7 +7,6 @@ JSON details support, and function execution tracking.
 [![Downloads](https://static.pepy.tech/badge/pretty-pie-log/month)](https://pepy.tech/project/pretty-pie-log)
 [![Supported Versions](https://img.shields.io/pypi/pyversions/pretty-pie-log.svg)](https://pypi.org/project/pretty-pie-log)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
----
 
 ## Installation
 
@@ -23,9 +22,8 @@ pip install pretty-pie-log
   and `details`.
 - **Thread-Safe**: Built-in thread safety for reliable logging in multi-threaded applications.
 - **Timezone Support**: Configurable timezone for timestamp display (default: UTC).
-- **Structured Logging**: JSON formatting for detailed logging information with optional indentation.
 - **Automatic Path Detection**: Detects relative file paths based on the project root.
-- **Stack Trace Integration**: Optionally include full stack trace details for exceptions.
+- **Error Trace Integration**: Optionally include full error trace details for exceptions.
 - **Function Execution Tracking**: Decorator for logging function entry, exit, arguments, and results with configurable
   log levels.
 - **File Logging**: Configurable rotating file logging with size limits and backup files.
