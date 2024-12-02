@@ -3,20 +3,10 @@
 A feature-rich, thread-safe Python logging utility that provides colorized console output with customizable formatting,
 JSON details support, and function execution tracking.
 
-<div style="display: flex;flex-direction: row;gap: 1rem; justify-content: center; align-items: center;">
-<div style="display: flex;">
-
 [![PyPI version](https://badge.fury.io/py/pretty-pie-log.svg)](https://badge.fury.io/py/pretty-pie-log)
-
-</div>
-
-<div style="display: flex;">
-
+[![Downloads](https://static.pepy.tech/badge/pretty-pie-log/month)](https://pepy.tech/project/pretty-pie-log)
+[![Supported Versions](https://img.shields.io/pypi/pyversions/pretty-pie-log.svg)](https://pypi.org/project/pretty-pie-log)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-</div>
-</div>
-
 ---
 
 ## Installation
@@ -132,7 +122,9 @@ logger = PieLogger(
     max_backup_files=10  # Number of backup log files to keep
 )
 ```
+
 ### Output using the above configuration
+
 ![image](https://github.com/user-attachments/assets/24fe9c46-1108-4381-a1d0-60c870b1832a)
 ---
 
@@ -203,6 +195,7 @@ logger.error(
 ```
 
 ### Output:
+
 ![image](https://github.com/user-attachments/assets/0fe71acd-e831-434e-83a6-8faf59a5fba0)
 
 ### Automatic Serialization
