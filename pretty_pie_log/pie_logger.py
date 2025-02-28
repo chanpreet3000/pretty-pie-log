@@ -1,17 +1,17 @@
+import inspect
 import json
 import logging
-import inspect
-from functools import wraps
-from logging.handlers import RotatingFileHandler
-from threading import Lock
-
-import pytz
 import os
 import sys
 import traceback
 from datetime import datetime
-from colorama import Fore, Style
+from functools import wraps
+from logging.handlers import RotatingFileHandler
+from threading import Lock
 from typing import Any, Callable, Dict, Optional, TypeVar, Union
+
+import pytz
+from colorama import Fore, Style
 
 from .pie_log_level import PieLogLevel
 
@@ -53,7 +53,7 @@ class PieLogger:
             default_log_color: Fore = Fore.WHITE,
             details_indent: int = 2,
             log_to_file: bool = True,
-            log_directory: str = 'logs',
+            relative_log_directory_path: str = 'logs',
             log_file_size_limit: int = 32 * 1024 * 1024,
             max_backup_files: int = 0,
     ) -> None:
@@ -79,9 +79,9 @@ class PieLogger:
             default_log_color (Fore): Fallback color when colorful is False (default: Fore.WHITE)
             details_indent (int): Spaces for JSON indentation (default: 2)
             log_to_file (bool): Enable/disable file logging (default: True)
-            log_directory (str): Directory for log files (default: 'logs')
+            relative_log_directory_path (str): Directory for log files (default: 'logs')
             log_file_size_limit (int): Maximum size for log files in bytes (default: 32 MB = 32 * 1024 * 1024)
-            max_backup_files (int): Number of backup log files to keep (default: 10)
+            max_backup_files (int): Number of backup log files to keep (default: 0)
         """
         self._start_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
@@ -91,11 +91,19 @@ class PieLogger:
         self._log_level_padding = log_level_padding
         self._file_path_padding = file_path_padding
         self._colorful = colorful
-        self._project_root = PieLogger.__get_project_root()
         self._minimum_log_level = minimum_log_level
         self._default_log_color = default_log_color
         self._details_indent = details_indent
         self._log_lock = Lock()
+
+        frame = inspect.currentframe()
+        if frame:
+            outer_frame = inspect.getouterframes(frame)[1]
+            self._initialization_directory = os.path.dirname(os.path.abspath(outer_frame.filename))
+        else:
+            self._initialization_directory = os.getcwd()
+
+        self._project_root = self._initialization_directory
 
         self.console_logger: logging.Logger
         self._debug_log_color = debug_log_color
@@ -108,7 +116,7 @@ class PieLogger:
         self._details_log_color = details_log_color
 
         self._log_to_file = log_to_file
-        self._log_directory = log_directory
+        self._relative_log_directory_path = relative_log_directory_path
         self._log_file_size_limit = log_file_size_limit
         self._max_backup_files = max_backup_files
 
@@ -127,7 +135,7 @@ class PieLogger:
 
         if self._log_to_file:
             # File logger setup
-            logs_dir = os.path.join(self.__get_project_root(), self._log_directory, self._start_timestamp)
+            logs_dir = os.path.join(self._project_root, self._relative_log_directory_path)
             os.makedirs(logs_dir, exist_ok=True)
             log_file_path = os.path.join(logs_dir, f"{self._logger_name}.log")
 
@@ -143,24 +151,6 @@ class PieLogger:
 
             # Add the file handler to the logger
             self.file_logger.addHandler(file_handler)
-
-    @staticmethod
-    def __get_project_root() -> str:
-        """
-        Determine the project's root directory by searching for main.py file.
-
-        Returns:
-            Absolute path to the project root directory. Falls back to the current
-            directory if main.py cannot be found in any parent directory.
-        """
-        current_path = os.path.abspath(os.path.dirname(__file__))
-        while True:
-            if os.path.exists(os.path.join(current_path, 'main.py')):
-                return current_path
-            parent_path = os.path.dirname(current_path)
-            if parent_path == current_path:
-                return os.path.abspath(os.path.dirname(__file__))
-            current_path = parent_path
 
     def __extract_caller_location(self) -> str:
         """

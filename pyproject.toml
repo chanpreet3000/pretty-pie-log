@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pretty_pie_log"
+version = "0.3.13"
+description = "A feature-rich logging utility that provides colorized console output with customizable formatting"
+readme = "README.md"
+authors = [
+    {name = "chanpreet3000"}
+]
+requires-python = ">=3.7"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords = [
+    "logging",
+    "colorized",
+    "console",
+    "debug",
+    "formatting",
+    "pretty-print",
+    "thread-safe",
+    "timezone",
+    "structured-logging"
+]
+dependencies = [
+    "colorama>=0.4.6",
+    "pytz>=2024.2"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/chanpreet3000/pretty-pie-log"
+"Bug Tracker" = "https://github.com/chanpreet3000/pretty-pie-log/issues"
+"Source Code" = "https://github.com/chanpreet3000/pretty-pie-log"
+
+[tool.setuptools]
+packages = ["pretty_pie_log"]
+package-data = {"pretty_pie_log" = ["py.typed"]}
+include-package-data = true
