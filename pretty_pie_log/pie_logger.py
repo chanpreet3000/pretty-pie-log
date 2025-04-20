@@ -56,6 +56,7 @@ class PieLogger:
             relative_log_directory_path: str = 'logs',
             log_file_size_limit: int = 32 * 1024 * 1024,
             max_backup_files: int = 0,
+            global_context: bool = False,
     ) -> None:
         """
         Initialize a new Logger instance with customizable formatting, color and output options.
@@ -82,6 +83,7 @@ class PieLogger:
             relative_log_directory_path (str): Directory for log files (default: 'logs')
             log_file_size_limit (int): Maximum size for log files in bytes (default: 32 MB = 32 * 1024 * 1024)
             max_backup_files (int): Number of backup log files to keep (default: 0)
+            global_context (bool): Enable/disable global context logging (default: False)
         """
         self._start_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
@@ -119,6 +121,8 @@ class PieLogger:
         self._relative_log_directory_path = relative_log_directory_path
         self._log_file_size_limit = log_file_size_limit
         self._max_backup_files = max_backup_files
+        self._global_context = global_context
+        self._context: Dict[str, Any] = {}
 
         self.__initialize_logger()
 
@@ -222,24 +226,50 @@ class PieLogger:
             is_colorful = colorful
         return color if is_colorful else self._default_log_color
 
-    def make_serializable(self, obj: Any):
+    def __make_serializable(self, obj: Any):
         """
         Recursively convert non-serializable objects in a nested structure
         (e.g., dict, list, tuple) into JSON-serializable equivalents.
         """
         if isinstance(obj, dict):
             return {
-                self.make_serializable(key): self.make_serializable(value)
+                self.__make_serializable(key): self.__make_serializable(value)
                 for key, value in obj.items()
             }
         elif isinstance(obj, (list, tuple)):
-            return [self.make_serializable(item) for item in obj]
+            return [self.__make_serializable(item) for item in obj]
         elif isinstance(obj, set):
-            return list(self.make_serializable(item) for item in obj)
+            return list(self.__make_serializable(item) for item in obj)
         elif isinstance(obj, (str, int, float, bool, type(None))):
             return obj
 
         return str(obj)
+
+    def add_context(self, key: str, value: Any) -> None:
+        """
+        Add or update a key-value pair in the logger's context.
+
+        Args:
+            key (str): The key to add or update
+            value (Any): The value to associate with the key
+        """
+        with self._log_lock:
+            self._context[key] = value
+
+    def remove_context(self, key: str) -> None:
+        """
+        Remove a key from the logger's context.
+
+        Args:
+            key (str): The key to remove
+        """
+        with self._log_lock:
+            self._context.pop(key, None)
+
+    def clear_context(self) -> None:
+        """Clear all context from the logger."""
+        with self._log_lock:
+            self._context.clear()
 
     def __console_log(
             self,
@@ -281,9 +311,14 @@ class PieLogger:
             console_log = " ".join(console_log_parts)
 
             if details:
-                serializable_details = self.make_serializable(details)
+                serializable_details = self.__make_serializable(details)
                 formatted_details = json.dumps(serializable_details, indent=self._details_indent)
                 console_log += f"\n{details_log_color}{formatted_details}"
+
+            if self._global_context and self._context:
+                context_details = self.__make_serializable(self._context)
+                formatted_context = json.dumps(context_details, indent=self._details_indent)
+                console_log += f"\n{details_log_color}Context: {formatted_context}"
 
             if print_exception:
                 exec_details = ''.join(traceback.format_exc())
@@ -323,9 +358,14 @@ class PieLogger:
         file_log = " ".join(file_log_parts)
 
         if details:
-            serializable_details = self.make_serializable(details)
+            serializable_details = self.__make_serializable(details)
             formatted_details = json.dumps(serializable_details, indent=self._details_indent)
             file_log += f"\n{formatted_details}"
+
+        if self._global_context and self._context:
+            context_details = self.__make_serializable(self._context)
+            formatted_context = json.dumps(context_details, indent=self._details_indent)
+            file_log += f"\nContext: {formatted_context}"
 
         if print_exception:
             exec_details = ''.join(traceback.format_exc())

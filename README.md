@@ -31,6 +31,7 @@ pip install pretty-pie-log
 - **Enhanced Log Details Serialization**: Handles non-serializable objects in logs by converting them into readable
   formats.
 - **Default Colors and Settings**: New fields for default log colors and detailed customization.
+- **Global Context Support**: For request tracing and correlation.
 
 ---
 
@@ -117,7 +118,10 @@ logger = PieLogger(
     log_to_file=True,  # Enable/disable file logging
     log_directory="logs",  # Directory for log files
     log_file_size_limit=32 * 1024 * 1024,  # Max log file size (32 MB)
-    max_backup_files=10  # Number of backup log files to keep
+    max_backup_files=10,  # Number of backup log files to keep
+
+    # Global Context Options
+    global_context=False  # Enable/disable global context logging
 )
 ```
 
@@ -277,3 +281,69 @@ Contributions are welcome! Submit your ideas or pull requests.
 ## License
 
 [MIT License](LICENSE)
+
+## Usage
+
+### Basic Usage
+
+```python
+from pretty_pie_log import PieLogger, PieLogLevel
+
+# Initialize logger
+logger = PieLogger(
+    logger_name="my_app",
+    timezone="UTC",
+    minimum_log_level=PieLogLevel.INFO
+)
+
+# Log messages
+logger.debug("Debug message")
+logger.info("Info message")
+logger.warning("Warning message")
+logger.error("Error message")
+logger.critical("Critical message")
+```
+
+### Context Management
+
+The logger supports global context for request tracing and correlation. When enabled, the context will be included in all log messages.
+
+```python
+# Initialize logger with context enabled
+logger = PieLogger(
+    logger_name="my_app",
+    global_context=True  # Enable context logging
+)
+
+# Add context information
+logger.add_context("request_id", "12345")
+logger.add_context("user_id", "user123")
+
+# Log messages will include the context
+logger.info("Processing request")
+
+# Remove specific context
+logger.remove_context("user_id")
+
+# Clear all context
+logger.clear_context()
+```
+
+### Function Execution Logging
+
+```python
+@logger.log_execution(
+    start_message="Starting task...",  # Optional: Custom start message
+    end_message="Task complete.",  # Optional: Custom end message
+    print_args_at_start=True,  # Log function arguments
+    print_result_at_end=True,  # Log function return values
+    start_message_log_level=PieLogLevel.DEBUG,  # Customizable log levels
+    end_message_log_level=PieLogLevel.INFO
+)
+def task(arg1, arg2):
+    return "result"
+```
+
+### Console Output
+
+![image](https://github.com/user-attachments/assets/15c5ccac-6808-4543-ad1c-7f6895593244)

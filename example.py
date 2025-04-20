@@ -9,7 +9,8 @@ from pretty_pie_log import PieLogger, PieLogLevel
 logger = PieLogger(
     logger_name="TestLogger",
     minimum_log_level=PieLogLevel.DEBUG,
-    colorful=True
+    colorful=True,
+    global_context=True
 )
 
 
@@ -78,6 +79,11 @@ def main():
     # Test different color settings
     logger.debug("Colored debug message", colorful=True)
     logger.info("Black and white info message", colorful=False)
+    
+    logger.add_context("user_id", 12345)
+    logger.add_context("user_name", "John Doe")
+    logger.add_context("user_email", "john.doe@example.com")
+    logger.info("User details", details={"user_id": 12345, "user_name": "John Doe", "user_email": "john.doe@example.com"})
 
 
 if __name__ == "__main__":
