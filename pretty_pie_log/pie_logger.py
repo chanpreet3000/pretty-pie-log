@@ -8,7 +8,7 @@ from datetime import datetime
 from functools import wraps
 from logging.handlers import RotatingFileHandler
 from threading import Lock
-from typing import Any, Callable, Dict, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypeVar
 
 import pytz
 from colorama import Fore, Style
@@ -16,6 +16,11 @@ from colorama import Fore, Style
 from .pie_log_level import PieLogLevel
 
 T = TypeVar('T')  # For generic return type in decorator
+
+# Frames belonging to this file are skipped when resolving the caller location. Taken from a local code
+# object rather than __file__ so it matches co_filename exactly and works when __file__ is absent
+# (frozen builds); this mirrors how the stdlib logging module identifies its own frames.
+_PIE_LOGGER_FILE = os.path.normcase((lambda: None).__code__.co_filename)
 
 
 class PieLogger:
@@ -97,11 +102,14 @@ class PieLogger:
         self._default_log_color = default_log_color
         self._details_indent = details_indent
         self._log_lock = Lock()
+        # Caches absolute filename -> display path, so os.path.relpath runs once per source file.
+        self._relative_path_cache: Dict[str, str] = {}
 
         frame = inspect.currentframe()
-        if frame:
-            outer_frame = inspect.getouterframes(frame)[1]
-            self._initialization_directory = os.path.dirname(os.path.abspath(outer_frame.filename))
+        caller_frame = frame.f_back if frame else None
+        if caller_frame:
+            caller_file = caller_frame.f_code.co_filename
+            self._initialization_directory = os.path.dirname(os.path.abspath(caller_file))
         else:
             self._initialization_directory = os.getcwd()
 
@@ -160,19 +168,38 @@ class PieLogger:
         """
         Extract file path and line number information from the call stack.
 
+        Walks the frame chain directly (as `logging.Logger.findCaller` does) instead of materialising the
+        whole stack via `inspect.stack()`, which would build a FrameInfo - module lookup, source file
+        resolution and a `linecache` stat - for every frame just to read two attributes off one of them.
+
+        The first frame outside this module is treated as the caller, so wrappers around the logger are
+        attributed to their own caller rather than to a hardcoded stack depth.
+
         Returns:
             str: Formatted string containing relative file path and line number
         """
-        frame = inspect.stack()[4]
-        file_name = frame.filename
-        line_number = frame.lineno
+        frame = sys._getframe(1) if hasattr(sys, '_getframe') else inspect.currentframe()
 
-        project_root = self._project_root
-        relative_file_name = os.path.relpath(file_name, project_root)
-        relative_file_name = f"./{relative_file_name.replace(os.sep, '/')}"
+        while frame is not None and os.path.normcase(frame.f_code.co_filename) == _PIE_LOGGER_FILE:
+            frame = frame.f_back
 
-        file_path_info = f"{relative_file_name}:{line_number}"
-        return file_path_info
+        if frame is None:
+            return "<unknown>:0"
+
+        file_name = frame.f_code.co_filename
+        line_number = frame.f_lineno
+
+        relative_file_name = self._relative_path_cache.get(file_name)
+        if relative_file_name is None:
+            try:
+                relative_file_name = os.path.relpath(file_name, self._project_root)
+            except ValueError:
+                # Different drive on Windows - relpath is not expressible, fall back to the absolute path.
+                relative_file_name = file_name
+            relative_file_name = f"./{relative_file_name.replace(os.sep, '/')}"
+            self._relative_path_cache[file_name] = relative_file_name
+
+        return f"{relative_file_name}:{line_number}"
 
     def __get_timestamp(self) -> str:
         """
@@ -275,8 +302,11 @@ class PieLogger:
             self,
             level: int,
             message: str,
-            details: Optional[Any],
-            print_exception: Optional[Union[bool, Exception]],
+            timestamp: str,
+            file_path_info: str,
+            formatted_details: Optional[str],
+            formatted_context: Optional[str],
+            exec_details: Optional[str],
             colorful: Optional[bool]
     ) -> str:
         """
@@ -285,53 +315,50 @@ class PieLogger:
         Args:
             level (int): Logging level
             message (str): Main log message
-            details (Optional[Any]): Additional structured data to include as JSON
-            print_exception (Optional[Union[bool, Exception]]): Exception object or boolean for error stack trace inclusion
+            timestamp (str): Pre-formatted timestamp, shared with the file output
+            file_path_info (str): Pre-resolved caller location, shared with the file output
+            formatted_details (Optional[str]): Pre-serialized JSON details, or None
+            formatted_context (Optional[str]): Pre-serialized JSON global context, or None
+            exec_details (Optional[str]): Pre-formatted stack trace, or None
             colorful (Optional[bool]): Override for color output settings
 
         Returns:
             str: Formatted log message string with color codes and styling
         """
-        with self._log_lock:
-            timestamp_log_color = self.__get_final_color(self._timestamp_log_color, colorful)
-            file_path_log_color = self.__get_final_color(self._file_path_log_color, colorful)
-            details_log_color = self.__get_final_color(self._details_log_color, colorful)
-            level_color = self.__get_final_color(self.__get_color_from_level(level), colorful)
-            level_name = PieLogLevel.get_level_str(level)
+        timestamp_log_color = self.__get_final_color(self._timestamp_log_color, colorful)
+        file_path_log_color = self.__get_final_color(self._file_path_log_color, colorful)
+        details_log_color = self.__get_final_color(self._details_log_color, colorful)
+        level_color = self.__get_final_color(self.__get_color_from_level(level), colorful)
+        level_name = PieLogLevel.get_level_str(level)
 
-            file_path_info = self.__extract_caller_location()
-            timestamp = self.__get_timestamp()
+        console_log_parts = [
+            f"{timestamp_log_color}{timestamp:<{self._timestamp_padding}}",
+            f"{level_color}{level_name:<{self._log_level_padding}}",
+            f"{file_path_log_color}{file_path_info:<{self._file_path_padding}}",
+            f": {level_color}{message}"
+        ]
+        console_log = " ".join(console_log_parts)
 
-            console_log_parts = [
-                f"{timestamp_log_color}{timestamp:<{self._timestamp_padding}}",
-                f"{level_color}{level_name:<{self._log_level_padding}}",
-                f"{file_path_log_color}{file_path_info:<{self._file_path_padding}}",
-                f": {level_color}{message}"
-            ]
-            console_log = " ".join(console_log_parts)
+        if formatted_details is not None:
+            console_log += f"\n{details_log_color}{formatted_details}"
 
-            if details:
-                serializable_details = self.__make_serializable(details)
-                formatted_details = json.dumps(serializable_details, indent=self._details_indent)
-                console_log += f"\n{details_log_color}{formatted_details}"
+        if formatted_context is not None:
+            console_log += f"\n{details_log_color}Context: {formatted_context}"
 
-            if self._global_context and self._context:
-                context_details = self.__make_serializable(self._context)
-                formatted_context = json.dumps(context_details, indent=self._details_indent)
-                console_log += f"\n{details_log_color}Context: {formatted_context}"
+        if exec_details is not None:
+            console_log += f"\n{level_color}{exec_details}"
 
-            if print_exception:
-                exec_details = ''.join(traceback.format_exc())
-                console_log += f"\n{level_color}{exec_details}"
-
-            return console_log + f"{Style.RESET_ALL}"
+        return console_log + f"{Style.RESET_ALL}"
 
     def __file_log(
             self,
             level: int,
             message: str,
-            details: Optional[Any],
-            print_exception: Optional[Union[bool, Exception]]
+            timestamp: str,
+            file_path_info: str,
+            formatted_details: Optional[str],
+            formatted_context: Optional[str],
+            exec_details: Optional[str]
     ) -> str:
         """
         Format a log message for file output without color codes or styling.
@@ -339,15 +366,16 @@ class PieLogger:
         Args:
             level (int): Logging severity level
             message (str): Main log message text
-            details (Optional[Any]: Additional contextual data to include as formatted JSON
-            print_exception (bool): Exception information or flag for error stack trace inclusion
+            timestamp (str): Pre-formatted timestamp, shared with the console output
+            file_path_info (str): Pre-resolved caller location, shared with the console output
+            formatted_details (Optional[str]): Pre-serialized JSON details, or None
+            formatted_context (Optional[str]): Pre-serialized JSON global context, or None
+            exec_details (Optional[str]): Pre-formatted stack trace, or None
 
         Returns:
             Formatted log message string suitable for file output
         """
-        timestamp = self.__get_timestamp()
         level_name = PieLogLevel.get_level_str(level)
-        file_path_info = self.__extract_caller_location()
 
         file_log_parts = [
             f"{timestamp:<{self._timestamp_padding}}",
@@ -357,18 +385,13 @@ class PieLogger:
         ]
         file_log = " ".join(file_log_parts)
 
-        if details:
-            serializable_details = self.__make_serializable(details)
-            formatted_details = json.dumps(serializable_details, indent=self._details_indent)
+        if formatted_details is not None:
             file_log += f"\n{formatted_details}"
 
-        if self._global_context and self._context:
-            context_details = self.__make_serializable(self._context)
-            formatted_context = json.dumps(context_details, indent=self._details_indent)
+        if formatted_context is not None:
             file_log += f"\nContext: {formatted_context}"
 
-        if print_exception:
-            exec_details = ''.join(traceback.format_exc())
+        if exec_details is not None:
             file_log += f"\n{exec_details}"
 
         return file_log
@@ -384,6 +407,11 @@ class PieLogger:
         """
         Process and output a log message to all configured destinations.
 
+        The level is checked before any formatting work happens, so suppressed messages cost almost
+        nothing. Everything shared by the console and file outputs - caller location, timestamp,
+        serialized details, context and stack trace - is computed exactly once here, which also
+        guarantees both destinations report the same timestamp for a given call.
+
         Args:
             level (int): Logging level
             message (str): Main log message
@@ -391,11 +419,40 @@ class PieLogger:
             print_exception (bool): Whether to include error trace
             colorful (Optional[bool]): Whether to apply colors to this specific message
         """
-        console_log = self.__console_log(level, message, details, print_exception, colorful)
+        if level < self._minimum_log_level:
+            return
+
+        timestamp = self.__get_timestamp()
+        file_path_info = self.__extract_caller_location()
+
+        formatted_details: Optional[str] = None
+        if details:
+            formatted_details = json.dumps(self.__make_serializable(details), indent=self._details_indent)
+
+        formatted_context: Optional[str] = None
+        if self._global_context and self._context:
+            with self._log_lock:
+                context_snapshot = dict(self._context)
+            if context_snapshot:
+                formatted_context = json.dumps(
+                    self.__make_serializable(context_snapshot), indent=self._details_indent
+                )
+
+        exec_details: Optional[str] = None
+        if print_exception:
+            exec_details = ''.join(traceback.format_exc())
+
+        console_log = self.__console_log(
+            level, message, timestamp, file_path_info,
+            formatted_details, formatted_context, exec_details, colorful
+        )
         self.console_logger.log(level, console_log)
 
         if self._log_to_file:
-            file_log = self.__file_log(level, message, details, print_exception)
+            file_log = self.__file_log(
+                level, message, timestamp, file_path_info,
+                formatted_details, formatted_context, exec_details
+            )
             self.file_logger.log(level, file_log)
 
     def log(
