@@ -117,9 +117,9 @@ logger = PieLogger(
 
     # Rotating File Logging
     log_to_file=True,  # Enable/disable file logging
-    log_directory="logs",  # Directory for log files
+    relative_log_directory_path="logs",  # Relative to the file that creates the logger; absolute paths work too
     log_file_size_limit=32 * 1024 * 1024,  # Max log file size (32 MB)
-    max_backup_files=10,  # Number of backup log files to keep
+    max_backup_files=10,  # Number of backup log files to keep (default 1; 0 turns rotation off)
 
     # Global Context Options
     global_context=False  # Enable/disable global context logging
@@ -143,6 +143,8 @@ logger.info(
     colorful=False  # Optional: Override global color settings for this log
 )
 ```
+
+`message` is written as-is, newlines included, so put untrusted input in `details`, which is JSON-escaped.
 
 ### Enhanced `details` Parameter
 
@@ -259,6 +261,9 @@ def task(arg1, arg2):
     return "result"
 ```
 
+The decorator also works on `async def` functions. If the function raises, an `Exception in <name>` error with the
+traceback is logged and the exception is re-raised.
+
 ### Console Output
 
 ![image](https://github.com/user-attachments/assets/15c5ccac-6808-4543-ad1c-7f6895593244)
@@ -308,7 +313,10 @@ logger.critical("Critical message")
 
 ### Context Management
 
-The logger supports global context for request tracing and correlation. When enabled, the context will be included in all log messages.
+The logger supports context for request tracing and correlation. When enabled, the context will be included in all log messages.
+
+Context is kept per thread and per asyncio task, so concurrent requests never see each other's values. A thread
+does not inherit values set in another thread: call `add_context` inside the thread that handles the request.
 
 ```python
 # Initialize logger with context enabled

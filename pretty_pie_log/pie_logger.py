@@ -2,11 +2,12 @@ import inspect
 import json
 import logging
 import os
+import re
 import sys
 import traceback
+from contextvars import ContextVar
 from datetime import datetime
 from functools import wraps
-from threading import Lock
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 import pytz
@@ -15,7 +16,9 @@ from concurrent_log_handler import ConcurrentRotatingFileHandler
 
 from .pie_log_level import PieLogLevel
 
-T = TypeVar('T')  # For generic return type in decorator
+T = TypeVar('T')
+
+_JSON_SCALARS = (str, int, float, bool, type(None))
 
 # Frames belonging to this file are skipped when resolving the caller location. Taken from a local code
 # object rather than __file__ so it matches co_filename exactly and works when __file__ is absent
@@ -60,7 +63,7 @@ class PieLogger:
             log_to_file: bool = True,
             relative_log_directory_path: str = 'logs',
             log_file_size_limit: int = 32 * 1024 * 1024,
-            max_backup_files: int = 0,
+            max_backup_files: int = 1,
             global_context: bool = False,
     ) -> None:
         """
@@ -87,13 +90,15 @@ class PieLogger:
             log_to_file (bool): Enable/disable file logging (default: True)
             relative_log_directory_path (str): Directory for log files (default: 'logs')
             log_file_size_limit (int): Maximum size for log files in bytes (default: 32 MB = 32 * 1024 * 1024)
-            max_backup_files (int): Number of backup log files to keep (default: 0)
-            global_context (bool): Enable/disable global context logging (default: False)
+            max_backup_files (int): Number of backup log files to keep (default: 1). With 0 the file is
+                never rotated and log_file_size_limit is ignored
+            global_context (bool): Include the context set with add_context in every message (default: False)
         """
         self._start_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         self._logger_name = logger_name
-        self._timezone = timezone
+        # Resolved here so an unknown timezone fails at construction instead of on every log call
+        self._tz = pytz.timezone(timezone) if timezone else pytz.utc
         self._timestamp_padding = timestamp_padding
         self._log_level_padding = log_level_padding
         self._file_path_padding = file_path_padding
@@ -101,7 +106,6 @@ class PieLogger:
         self._minimum_log_level = minimum_log_level
         self._default_log_color = default_log_color
         self._details_indent = details_indent
-        self._log_lock = Lock()
         # Caches absolute filename -> display path, so os.path.relpath runs once per source file.
         self._relative_path_cache: Dict[str, str] = {}
 
@@ -130,7 +134,9 @@ class PieLogger:
         self._log_file_size_limit = log_file_size_limit
         self._max_backup_files = max_backup_files
         self._global_context = global_context
-        self._context: Dict[str, Any] = {}
+        # A ContextVar gives every thread and asyncio task its own context, so concurrent requests cannot
+        # log each other's values. The dict is replaced on every change, never mutated: the default is shared.
+        self._context: ContextVar[Dict[str, Any]] = ContextVar(f"{logger_name}_context", default={})
 
         self.__initialize_logger()
 
@@ -140,33 +146,38 @@ class PieLogger:
         Creates log directory structure if needed and configures rotating file handler if file
         logging is enabled.
         """
-        # Console logger setup
         self.console_logger = logging.getLogger(f"{self._logger_name}_console")
         self.console_logger.setLevel(self._minimum_log_level)
-        self.console_logger.addHandler(logging.StreamHandler(sys.stdout))
+        # Root handlers installed by the app or a framework would print every line a second time
+        self.console_logger.propagate = False
+        # getLogger returns one object per name, so a second PieLogger with this name must not stack handlers
+        if not self.console_logger.handlers:
+            self.console_logger.addHandler(logging.StreamHandler(sys.stdout))
 
         if self._log_to_file:
-            # File logger setup
             logs_dir = os.path.join(self._project_root, self._relative_log_directory_path)
             os.makedirs(logs_dir, exist_ok=True)
-            log_file_path = os.path.join(logs_dir, f"{self._logger_name}.log")
+            # Separators would escape logs_dir, and ':' on Windows writes to an NTFS alternate stream
+            log_file_name = re.sub(r'[\\/:*?"<>|]', '_', self._logger_name)
+            log_file_path = os.path.join(logs_dir, f"{log_file_name}.log")
 
             self.file_logger = logging.getLogger(f"{self._logger_name}_file")
             self.file_logger.setLevel(self._minimum_log_level)
+            self.file_logger.propagate = False
 
-            # The stdlib RotatingFileHandler breaks when several processes share the file (gunicorn
-            # workers): after one rotates, each of the others rotates again, so near-empty files push
-            # the real ones out of the backups. This handler locks the file around writes and rotation.
-            file_handler = ConcurrentRotatingFileHandler(
-                filename=log_file_path,
-                # With no backups this handler would empty the file at the limit, where the stdlib one
-                # never rotated. 0 turns rotation off and keeps that behaviour.
-                maxBytes=self._log_file_size_limit if self._max_backup_files > 0 else 0,
-                backupCount=self._max_backup_files
-            )
-
-            # Add the file handler to the logger
-            self.file_logger.addHandler(file_handler)
+            if not self.file_logger.handlers:
+                # The stdlib RotatingFileHandler breaks when several processes share the file (gunicorn
+                # workers): after one rotates, each of the others rotates again, so near-empty files push
+                # the real ones out of the backups. This handler locks the file around writes and rotation.
+                self.file_logger.addHandler(ConcurrentRotatingFileHandler(
+                    filename=log_file_path,
+                    # With no backups this handler would empty the file at the limit, where the stdlib one
+                    # never rotated. 0 turns rotation off and keeps that behaviour.
+                    maxBytes=self._log_file_size_limit if self._max_backup_files > 0 else 0,
+                    backupCount=self._max_backup_files,
+                    # The Windows locale default (cp1252) silently drops every character it cannot encode
+                    encoding="utf-8"
+                ))
 
     def __extract_caller_location(self) -> str:
         """
@@ -212,11 +223,7 @@ class PieLogger:
         Returns:
             str: Formatted timestamp string with millisecond precision
         """
-        current_time = datetime.now(pytz.utc)
-        if self._timezone:
-            tz = pytz.timezone(self._timezone)
-            current_time = current_time.astimezone(tz)
-        return current_time.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        return datetime.now(self._tz).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
 
     def __get_color_from_level(self, level: int) -> Fore:
         """
@@ -264,43 +271,50 @@ class PieLogger:
         """
         if isinstance(obj, dict):
             return {
-                self.__make_serializable(key): self.__make_serializable(value)
+                key if isinstance(key, _JSON_SCALARS) else str(key): self.__make_serializable(value)
                 for key, value in obj.items()
             }
         elif isinstance(obj, (list, tuple)):
             return [self.__make_serializable(item) for item in obj]
         elif isinstance(obj, set):
             return list(self.__make_serializable(item) for item in obj)
-        elif isinstance(obj, (str, int, float, bool, type(None))):
+        elif isinstance(obj, _JSON_SCALARS):
             return obj
 
         return str(obj)
 
+    def __to_json(self, obj: Any) -> str:
+        """
+        Serialize details or context for output. Never raises: a log call must not take the caller down.
+        """
+        try:
+            return json.dumps(self.__make_serializable(obj), indent=self._details_indent)
+        except Exception as error:
+            # Circular or very deep structures (RecursionError) and objects whose __str__ raises
+            return f"<not serializable: {type(error).__name__}: {error}>"
+
     def add_context(self, key: str, value: Any) -> None:
         """
-        Add or update a key-value pair in the logger's context.
+        Add or update a key-value pair in the logger's context for the current thread or asyncio task.
 
         Args:
             key (str): The key to add or update
             value (Any): The value to associate with the key
         """
-        with self._log_lock:
-            self._context[key] = value
+        self._context.set({**self._context.get(), key: value})
 
     def remove_context(self, key: str) -> None:
         """
-        Remove a key from the logger's context.
+        Remove a key from the logger's context for the current thread or asyncio task.
 
         Args:
             key (str): The key to remove
         """
-        with self._log_lock:
-            self._context.pop(key, None)
+        self._context.set({k: v for k, v in self._context.get().items() if k != key})
 
     def clear_context(self) -> None:
-        """Clear all context from the logger."""
-        with self._log_lock:
-            self._context.clear()
+        """Clear all context for the current thread or asyncio task."""
+        self._context.set({})
 
     def __console_log(
             self,
@@ -430,20 +444,16 @@ class PieLogger:
         file_path_info = self.__extract_caller_location()
 
         formatted_details: Optional[str] = None
-        if details:
-            formatted_details = json.dumps(self.__make_serializable(details), indent=self._details_indent)
+        if details is not None:
+            formatted_details = self.__to_json(details)
 
         formatted_context: Optional[str] = None
-        if self._global_context and self._context:
-            with self._log_lock:
-                context_snapshot = dict(self._context)
-            if context_snapshot:
-                formatted_context = json.dumps(
-                    self.__make_serializable(context_snapshot), indent=self._details_indent
-                )
+        context = self._context.get() if self._global_context else None
+        if context:
+            formatted_context = self.__to_json(context)
 
         exec_details: Optional[str] = None
-        if print_exception:
+        if print_exception and sys.exc_info()[0] is not None:
             exec_details = ''.join(traceback.format_exc())
 
         console_log = self.__console_log(
@@ -626,10 +636,7 @@ class PieLogger:
         """
 
         def decorator(func: Callable[..., T]) -> Callable[..., T]:
-            @wraps(func)
-            def wrapper(*args: Any, **kwargs: Any) -> T:
-                # Use custom start message or default
-                start_msg = start_message or f"Start of {func.__name__}"
+            def log_start(args: Any, kwargs: Any) -> None:
                 start_details: Optional[Dict[str, str]] = None
                 if print_args_at_start:
                     start_details = {
@@ -639,30 +646,57 @@ class PieLogger:
                     }
                 self.__log(
                     level=start_message_log_level,
-                    message=start_msg,
+                    message=start_message or f"Start of {func.__name__}",
                     details=start_details,
                     colorful=self._colorful
                 )
 
-                # Execute function
-                result: T = func(*args, **kwargs)
-
-                # Use custom end message or default
-                end_msg = end_message or f"End of {func.__name__}"
+            def log_end(result: Any) -> None:
                 end_details: Optional[Dict[str, str]] = None
                 if print_result_at_end:
                     end_details = {
                         "function": func.__name__,
                         "result": str(result)
                     }
-
                 self.__log(
                     level=end_message_log_level,
-                    message=end_msg,
+                    message=end_message or f"End of {func.__name__}",
                     details=end_details,
                     colorful=self._colorful
                 )
 
+            def log_failure() -> None:
+                self.__log(
+                    level=PieLogLevel.ERROR,
+                    message=f"Exception in {func.__name__}",
+                    print_exception=True,
+                    colorful=self._colorful
+                )
+
+            if inspect.iscoroutinefunction(func):
+                # A sync wrapper would log the end, and the coroutine object as the result, before the body ran
+                @wraps(func)
+                async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                    log_start(args, kwargs)
+                    try:
+                        result = await func(*args, **kwargs)
+                    except Exception:
+                        log_failure()
+                        raise
+                    log_end(result)
+                    return result
+
+                return async_wrapper  # type: ignore[return-value]
+
+            @wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> T:
+                log_start(args, kwargs)
+                try:
+                    result: T = func(*args, **kwargs)
+                except Exception:
+                    log_failure()
+                    raise
+                log_end(result)
                 return result
 
             return wrapper
