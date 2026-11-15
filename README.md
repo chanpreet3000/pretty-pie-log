@@ -26,7 +26,8 @@ pip install pretty-pie-log
 - **Error Trace Integration**: Optionally include full error trace details for exceptions.
 - **Function Execution Tracking**: Decorator for logging function entry, exit, arguments, and results with configurable
   log levels.
-- **File Logging**: Configurable rotating file logging with size limits and backup files.
+- **File Logging**: Configurable rotating file logging with size limits and backup files. Several processes (for
+  example gunicorn workers) can share one log file.
 - **Customizable Formatting**: Adjust padding for timestamps, log levels, file paths, and other components.
 - **Enhanced Log Details Serialization**: Handles non-serializable objects in logs by converting them into readable
   formats.
@@ -268,6 +269,7 @@ def task(arg1, arg2):
 
 - Python 3.7+
 - colorama
+- concurrent-log-handler
 - pytz
 
 ---

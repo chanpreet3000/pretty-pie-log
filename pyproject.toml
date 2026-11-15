@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pretty_pie_log"
-version = "0.3.15"
+version = "0.3.16"
 description = "A feature-rich logging utility that provides colorized console output with customizable formatting"
 readme = "README.md"
 authors = [
@@ -39,6 +39,7 @@ keywords = [
 ]
 dependencies = [
     "colorama>=0.4.6",
+    "concurrent-log-handler>=0.9.31",
     "pytz>=2024.2"
 ]
 

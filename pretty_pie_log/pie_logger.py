@@ -6,12 +6,12 @@ import sys
 import traceback
 from datetime import datetime
 from functools import wraps
-from logging.handlers import RotatingFileHandler
 from threading import Lock
 from typing import Any, Callable, Dict, Optional, TypeVar
 
 import pytz
 from colorama import Fore, Style
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 
 from .pie_log_level import PieLogLevel
 
@@ -34,7 +34,7 @@ class PieLogger:
     - Structured logging with formatted JSON output
     - Automatic source code location detection
     - Error stack trace integration for debugging
-    - Rotating file logs with size limits and backups
+    - Rotating file logs with size limits and backups, safe to share between processes
     - Customizable field padding and indentation
     """
 
@@ -154,10 +154,14 @@ class PieLogger:
             self.file_logger = logging.getLogger(f"{self._logger_name}_file")
             self.file_logger.setLevel(self._minimum_log_level)
 
-            # Create a RotatingFileHandler
-            file_handler = RotatingFileHandler(
+            # The stdlib RotatingFileHandler breaks when several processes share the file (gunicorn
+            # workers): after one rotates, each of the others rotates again, so near-empty files push
+            # the real ones out of the backups. This handler locks the file around writes and rotation.
+            file_handler = ConcurrentRotatingFileHandler(
                 filename=log_file_path,
-                maxBytes=self._log_file_size_limit,
+                # With no backups this handler would empty the file at the limit, where the stdlib one
+                # never rotated. 0 turns rotation off and keeps that behaviour.
+                maxBytes=self._log_file_size_limit if self._max_backup_files > 0 else 0,
                 backupCount=self._max_backup_files
             )
 
